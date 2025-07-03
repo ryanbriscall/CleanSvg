@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Clean SVG</title>
+	<style>
+		*, *::before, *::after { box-sizing: border-box; }
+		body {
+			font-family: Arial, sans-serif;
+			max-width: 50em;
+			margin: 0 auto;
+			padding: 1rem;
+		}
+		textarea {
+			width: 100%;
+			height: 200px;
+		}
+		button {
+			padding: 0.5rem 1rem;
+			font-size: 1rem;
+		}
+		label { display: block; }
+	</style>
+</head>
+<body>
+
+<h1>Clean SVG</h1>
+
+<label for="input">Input (SVG)</label>
+<textarea id="input" placeholder="Paste SVG code here..."></textarea>
+
+<label><input type="checkbox" id="removeId" checked> Remove <code>id</code> attributes</label>
+<label><input type="checkbox" id="removeStyle" checked> Remove <code>style</code> attributes</label>
+<label><input type="checkbox" id="removeNamespaces" checked> Remove namespace attributes (e.g. <code>xmlns</code>, <code>xml:space</code>)</label>
+<label><input type="checkbox" id="removeImage" checked> Remove <code>&lt;image&gt;</code> elements</label>
+<label><input type="checkbox" id="removeXmlns" checked> Remove <code>xmlns</code></label>
+<label><input type="checkbox" id="removeDefs" checked> Remove <code>&lt;defs&gt;</code></label>
+<label><input type="checkbox" id="removeGWrapper" checked> Remove wrapping <code>&lt;g&gt;</code> tags</label>
+<label><input type="checkbox" id="cleanGroupAttrs" checked> Remove <code>id</code> and <code>style</code> from <code>&lt;g&gt;</code>/<code>&lt;defs&gt;</code></label>
+<label><input type="checkbox" id="roundViewBox" checked> Round viewBox decimals</label>
+<label><input type="checkbox" id="roundPathPoints" checked> Round path decimal points</label>
+<label><input type="checkbox" id="roundPolygonPoints" checked> Round polygon decimal points</label>
+<label><input type="checkbox" id="makeResponsive" checked> Make responsive (wrap in <code>&lt;div&gt;</code>, add <code>viewBox</code>)</label>
+
+<p><button id="convert">Clean</button></p>
+
+<label for="output">Output</label>
+<textarea id="output" readonly></textarea>
+
+<script>
+	document.getElementById('convert').addEventListener('click', function() {
+		const input = document.getElementById('input').value;
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(input, 'image/svg+xml');
+		const svg = doc.documentElement;
+
+		if (document.getElementById('removeXmlns').checked) {
+			for (let i = svg.attributes.length - 1; i >= 0; i--) {
+				const attr = svg.attributes[i];
+				if (/^xmlns(:|$)/.test(attr.name)) {
+					console.log(attr.name);
+					svg.removeAttribute(attr.name);
+				}
+			}
+		}
+
+		if (document.getElementById('removeDefs').checked) {
+			const defs = svg.querySelectorAll('defs');
+			defs.forEach(function(def) {
+				def.remove();
+			});
+		}
+
+		if (document.getElementById('cleanGroupAttrs').checked) {
+			const elements = svg.querySelectorAll('g, defs');
+			elements.forEach(function(el) {
+				el.removeAttribute('id');
+				el.removeAttribute('style');
+			});
+		}
+
+		if (document.getElementById('removeGWrapper').checked) {
+			const gTags = svg.querySelectorAll('g');
+			gTags.forEach(function(g) {
+				const parent = g.parentNode;
+				while (g.firstChild) {
+					parent.insertBefore(g.firstChild, g);
+				}
+				parent.removeChild(g);
+			});
+		}
+
+		if (document.getElementById('removeNamespaces').checked) {
+			for (let i = svg.attributes.length - 1; i >= 0; i--) {
+				const attr = svg.attributes[i];
+				if (/^xmlns(:|$)/.test(attr.name) || attr.name.startsWith("xml:") || attr.name === 'version') {
+					svg.removeAttribute(attr.name);
+				}
+			}
+		}
+
+		const paths = svg.querySelectorAll('path');
+		paths.forEach(function(path) {
+			if (document.getElementById('removeStyle').checked && path.hasAttribute('style')) {
+				path.removeAttribute('style');
+			}
+			if (document.getElementById('removeId').checked && path.hasAttribute('id')) {
+				path.removeAttribute('id');
+			}
+
+			if (document.getElementById('roundPathPoints').checked && path.hasAttribute('d')) {
+				const d = path.getAttribute('d');
+				const rounded = d.replace(/-?\d*\.?\d+/g, function(num) {
+					const n = parseFloat(num);
+					return isNaN(n) ? num : String(Math.round(n));
+				});
+				path.setAttribute('d', rounded);
+			}
+		});
+
+		const polygons = svg.querySelectorAll('polygon');
+		polygons.forEach(function(polygon) {
+			if (document.getElementById('removeStyle').checked && polygon.hasAttribute('style')) {
+				polygon.removeAttribute('style');
+			}
+			if (document.getElementById('removeId').checked && polygon.hasAttribute('id')) {
+				polygon.removeAttribute('id');
+			}
+
+			if (document.getElementById('roundPolygonPoints').checked && polygon.hasAttribute('points')) {
+				const pts = polygon.getAttribute('points');
+				const rounded = pts.replace(/-?\d*\.?\d+/g, function(num) {
+					const n = parseFloat(num);
+					return isNaN(n) ? num : String(Math.round(n));
+				});
+				polygon.setAttribute('points', rounded);
+			}
+		});
+
+		if (document.getElementById('removeImage').checked) {
+			svg.querySelectorAll('image').forEach(function(img) {
+				img.remove(); 
+			});
+		}
+
+		if (document.getElementById('removeId').checked) {
+			svg.removeAttribute('id');
+		}
+		if (document.getElementById('removeStyle').checked) {
+			svg.removeAttribute('style');
+		}
+
+		let viewBox = svg.getAttribute('viewBox');
+		if (!viewBox && svg.hasAttribute('width') && svg.hasAttribute('height')) {
+			const w = svg.getAttribute('width').replace(/[^\d.]/g, '');
+			const h = svg.getAttribute('height').replace(/[^\d.]/g, '');
+			viewBox = `0 0 ${w} ${h}`;
+			svg.setAttribute('viewBox', viewBox);
+		}
+		if (document.getElementById('roundViewBox').checked && viewBox) {
+			const rounded = viewBox
+				.trim()
+				.split(/\s+/)
+				.map(function(v) { return Math.round(parseFloat(v)); })
+				.join(' ');
+			svg.setAttribute('viewBox', rounded);
+			viewBox = rounded;
+		}
+
+		if (document.getElementById('makeResponsive').checked) {
+			svg.removeAttribute('width');
+			svg.removeAttribute('height');
+			svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+			svg.setAttribute('style', 'width: 100%; height: auto;');
+		}
+
+		const serializer = new XMLSerializer();
+		let svgContent = serializer.serializeToString(svg);
+		if (document.getElementById('removeXmlns').checked) {
+			svgContent = svgContent.replace(/ xmlns="[^"]+"/, '');
+		}
+
+		if (document.getElementById('makeResponsive').checked) {
+			const viewBox = svg.getAttribute('viewBox');
+			let maxWidth = '400px';
+
+			if (viewBox) {
+				const parts = viewBox.trim().split(/\s+/);
+				if (parts.length === 4) {
+					const height = parseFloat(parts[3]);
+					if (!isNaN(height)) {
+						maxWidth = `${height}px`;
+					}
+				}
+			}
+
+			output = `<div style="width: 100%; max-width: ${maxWidth};">\n  ${svgContent}\n</div>`;
+		}
+		else {
+			output = `<?xml version="1.0" encoding="UTF-8"?>\n${svgContent}`;
+		}
+
+		document.getElementById('output').value = output;
+	});
+</script>
+
+</body>
+</html>
