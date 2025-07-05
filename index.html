@@ -33,6 +33,7 @@
 <label><input type="checkbox" id="removeStyle" checked> Remove <code>style</code> attributes</label>
 <label><input type="checkbox" id="removeNamespaces" checked> Remove namespace attributes (e.g. <code>xmlns</code>, <code>xml:space</code>)</label>
 <label><input type="checkbox" id="removeImage" checked> Remove <code>&lt;image&gt;</code> elements</label>
+<label><input type="checkbox" id="removeTitle" checked> Remove <code>&lt;title&gt;</code> elements</label>
 <label><input type="checkbox" id="removeXmlns" checked> Remove <code>xmlns</code></label>
 <label><input type="checkbox" id="removeDefs" checked> Remove <code>&lt;defs&gt;</code></label>
 <label><input type="checkbox" id="removeGWrapper" checked> Remove wrapping <code>&lt;g&gt;</code> tags</label>
@@ -143,6 +144,12 @@
 			});
 		}
 
+		if (document.getElementById('removeTitle').checked) {
+			svg.querySelectorAll('title').forEach(function(img) {
+				img.remove(); 
+			});
+		}
+
 		if (document.getElementById('removeId').checked) {
 			svg.removeAttribute('id');
 		}
@@ -177,7 +184,11 @@
 		const serializer = new XMLSerializer();
 		let svgContent = serializer.serializeToString(svg);
 		if (document.getElementById('removeXmlns').checked) {
-			svgContent = svgContent.replace(/ xmlns="[^"]+"/, '');
+			svgContent = svgContent.replace(/\sxmlns="[^"]+"/, '');
+		}
+
+		if (document.getElementById('removeId').checked) {
+			svgContent = svgContent.replace(/\sid="[^"]+"/, '');
 		}
 
 		if (document.getElementById('makeResponsive').checked) {
